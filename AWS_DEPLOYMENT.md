@@ -1,6 +1,6 @@
 # 🚀 AWS EC2 + RDS Production Deployment Guide
 
-Complete guide to deploy your Laravel Kontak application on AWS EC2 with RDS database.
+Complete guide to deploy your Laravel Kontak application on AWS EC2 with RDS database using AWS Linux and nohup.
 
 ## **Phase 1: Setup AWS RDS Database**
 
@@ -32,19 +32,19 @@ Complete guide to deploy your Laravel Kontak application on AWS EC2 with RDS dat
 ### Launch EC2 Instance:
 ```bash
 # AWS Console → EC2 → Launch Instance
-- AMI: Ubuntu Server 22.04 LTS
+- AMI: Amazon Linux 2023
 - Instance Type: t3.micro (free tier) or t3.small
 - Key Pair: Create new or use existing
 - Security Group: Create new with these rules:
   * SSH (port 22): Your IP
   * HTTP (port 80): Anywhere
   * HTTPS (port 443): Anywhere
-  * Custom TCP (port 3000): Anywhere (for Laravel dev server)
+  * Custom TCP (port 8000): Anywhere (for Laravel server)
 ```
 
 ### Connect to your EC2 instance:
 ```bash
-ssh -i your-key.pem ubuntu@your-ec2-public-ip
+ssh -i your-key.pem ec2-user@your-ec2-public-ip
 ```
 
 ---
@@ -53,16 +53,19 @@ ssh -i your-key.pem ubuntu@your-ec2-public-ip
 
 ### Update system and install dependencies:
 ```bash
-sudo apt update && sudo apt upgrade -y
+sudo yum update -y
+
+# Install EPEL repository for additional packages
+sudo yum install -y epel-release
 
 # Install PHP 8.2 and extensions
-sudo apt install -y software-properties-common
-sudo add-apt-repository ppa:ondrej/php -y
-sudo apt update
-sudo apt install -y php8.2 php8.2-fpm php8.2-mysql php8.2-xml php8.2-gd php8.2-curl php8.2-zip php8.2-mbstring php8.2-bcmath php8.2-tokenizer php8.2-json php8.2-pdo
+sudo yum install -y amazon-linux-extras
+sudo amazon-linux-extras enable php8.2
+sudo yum clean metadata
+sudo yum install -y php php-cli php-fpm php-mysqlnd php-xml php-gd php-curl php-zip php-mbstring php-bcmath php-json php-pdo php-opcache
 
 # Install Nginx
-sudo apt install -y nginx
+sudo yum install -y nginx
 
 # Install Composer
 curl -sS https://getcomposer.org/installer | php
@@ -70,14 +73,11 @@ sudo mv composer.phar /usr/local/bin/composer
 sudo chmod +x /usr/local/bin/composer
 
 # Install Node.js and npm
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt install -y nodejs
+curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+sudo yum install -y nodejs
 
 # Install Git
-sudo apt install -y git
-
-# Install PM2 for process management
-sudo npm install -g pm2
+sudo yum install -y git
 ```
 
 ---
@@ -90,8 +90,8 @@ sudo npm install -g pm2
 cd /var/www
 
 # Clone your repository
-sudo git clone https://github.com/your-username/kontak.git
-sudo chown -R ubuntu:ubuntu kontak
+sudo git clone https://github.com/MachiBytes/kontak.git
+sudo chown -R ec2-user:ec2-user kontak
 cd kontak
 
 # Install PHP dependencies
@@ -102,10 +102,11 @@ npm install
 npm run build
 
 # Set proper permissions
-sudo chown -R www-data:www-data /var/www/kontak
+sudo chown -R nginx:nginx /var/www/kontak
 sudo chmod -R 755 /var/www/kontak
 sudo chmod -R 775 /var/www/kontak/storage
 sudo chmod -R 775 /var/www/kontak/bootstrap/cache
+sudo chown -R ec2-user:ec2-user /var/www/kontak
 ```
 
 ### Configure environment:
@@ -159,22 +160,16 @@ MAIL_FROM_ADDRESS="hello@yourdomain.com"
 MAIL_FROM_NAME="${APP_NAME}"
 ```
 
-### Generate application key and run migrations:
+### Setup Laravel application:
 ```bash
 # Generate application key
 php artisan key:generate
 
-# Create database (connect to RDS first)
-mysql -h your-rds-endpoint.amazonaws.com -u admin -p
-# In MySQL prompt:
-CREATE DATABASE kontak;
-exit
+# Run migrations (this will create the database automatically if it doesn't exist)
+php artisan migrate:fresh
 
-# Run migrations
-php artisan migrate --force
-
-# Seed demo data (optional)
-php artisan db:seed --class=DemoDataSeeder --force
+# Seed demo data
+php artisan db:seed
 
 # Clear and cache config
 php artisan config:cache
@@ -188,7 +183,7 @@ php artisan view:cache
 
 ### Create Nginx configuration:
 ```bash
-sudo nano /etc/nginx/sites-available/kontak
+sudo nano /etc/nginx/conf.d/kontak.conf
 ```
 
 **Add this configuration:**
@@ -216,7 +211,7 @@ server {
     error_page 404 /index.php;
 
     location ~ \.php$ {
-        fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+        fastcgi_pass 127.0.0.1:9000;
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;
@@ -228,124 +223,94 @@ server {
 }
 ```
 
-### Enable the site:
+### Configure PHP-FPM:
 ```bash
-sudo ln -s /etc/nginx/sites-available/kontak /etc/nginx/sites-enabled/
-sudo unlink /etc/nginx/sites-enabled/default
+# Configure PHP-FPM to listen on port 9000
+sudo nano /etc/php-fpm.d/www.conf
+```
+
+**Update these lines in the PHP-FPM configuration:**
+```ini
+listen = 127.0.0.1:9000
+user = nginx
+group = nginx
+```
+
+### Enable and start services:
+```bash
+# Remove default Nginx configuration
+sudo rm -f /etc/nginx/conf.d/default.conf
+
+# Test Nginx configuration
 sudo nginx -t
+
+# Start and enable services
+sudo systemctl start nginx
+sudo systemctl enable nginx
+sudo systemctl start php-fpm
+sudo systemctl enable php-fpm
+
+# Restart services
 sudo systemctl restart nginx
-sudo systemctl restart php8.2-fpm
+sudo systemctl restart php-fpm
 ```
 
 ---
 
-## **Phase 6: Setup Process Management (Keep Running Forever)**
+## **Phase 6: Start Application with nohup**
 
-### Create PM2 ecosystem file:
-```bash
-nano /var/www/kontak/ecosystem.config.js
-```
-
-**Add this configuration:**
-```javascript
-module.exports = {
-  apps: [{
-    name: 'kontak',
-    script: 'artisan',
-    args: 'serve --host=0.0.0.0 --port=8000',
-    cwd: '/var/www/kontak',
-    interpreter: 'php',
-    instances: 1,
-    autorestart: true,
-    watch: false,
-    max_memory_restart: '1G',
-    env: {
-      APP_ENV: 'production'
-    }
-  }]
-}
-```
-
-### Start application with PM2:
+### Start Laravel application:
 ```bash
 cd /var/www/kontak
-pm2 start ecosystem.config.js
-pm2 save
-pm2 startup
-# Follow the instructions given by pm2 startup command
+
+# Start Laravel in background with nohup
+nohup php artisan serve --host=0.0.0.0 --port=8000 > /var/log/laravel-app.log 2>&1 &
+
+# Save the process ID for future reference
+echo $! > /var/www/kontak/laravel.pid
+
+# Verify it's running
+ps aux | grep "artisan serve"
 ```
 
----
-
-## **Phase 7: Setup SSL with Let's Encrypt (Optional but Recommended)**
-
-### Install Certbot:
+### Application management commands:
 ```bash
-sudo apt install -y certbot python3-certbot-nginx
-```
+# Check if running
+ps aux | grep "artisan serve"
 
-### Get SSL certificate:
-```bash
-sudo certbot --nginx -d your-domain.com -d www.your-domain.com
-```
+# Stop the application
+kill $(cat /var/www/kontak/laravel.pid)
 
----
+# Restart the application
+cd /var/www/kontak
+nohup php artisan serve --host=0.0.0.0 --port=8000 > /var/log/laravel-app.log 2>&1 &
+echo $! > /var/www/kontak/laravel.pid
 
-## **Phase 8: Setup Firewall**
-
-### Configure UFW:
-```bash
-sudo ufw allow OpenSSH
-sudo ufw allow 'Nginx Full'
-sudo ufw enable
-```
-
----
-
-## **Phase 9: Domain Setup**
-
-### Point your domain to EC2:
-- Go to your domain registrar (GoDaddy, Namecheap, etc.)
-- Create an A record pointing to your EC2 public IP
-- Example: `yourdomain.com` → `54.123.45.67`
-
----
-
-## **Phase 10: Monitoring and Maintenance**
-
-### Useful PM2 commands:
-```bash
-pm2 status          # Check application status
-pm2 logs kontak     # View application logs
-pm2 restart kontak  # Restart application
-pm2 stop kontak     # Stop application
-pm2 delete kontak   # Delete application from PM2
+# View application server logs
+tail -f /var/log/laravel-app.log
 ```
 
 ### Update application:
 ```bash
 cd /var/www/kontak
+
+# Stop application
+kill $(cat /var/www/kontak/laravel.pid)
+
+# Update code
 git pull origin main
 composer install --optimize-autoloader --no-dev
 npm run build
+
+# Run migrations and cache
 php artisan migrate --force
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
-pm2 restart kontak
-```
 
-### Monitor logs:
-```bash
-# Application logs
-tail -f /var/www/kontak/storage/logs/laravel.log
-
-# Nginx logs
-sudo tail -f /var/log/nginx/error.log
-sudo tail -f /var/log/nginx/access.log
-
-# PM2 logs
-pm2 logs kontak
+# Restart application
+nohup php artisan serve --host=0.0.0.0 --port=8000 > /var/log/laravel-app.log 2>&1 &
+echo $! > /var/www/kontak/laravel.pid
 ```
 
 ---
@@ -354,20 +319,14 @@ pm2 logs kontak
 
 ### Keep system updated:
 ```bash
-sudo apt update && sudo apt upgrade -y
+sudo yum update -y
 ```
 
 ### Change default SSH port (optional):
 ```bash
 sudo nano /etc/ssh/sshd_config
 # Change Port 22 to Port 2222
-sudo systemctl restart ssh
-```
-
-### Setup automatic backups:
-```bash
-# Create backup script
-sudo nano /usr/local/bin/backup-kontak.sh
+sudo systemctl restart sshd
 ```
 
 ---
@@ -377,7 +336,6 @@ sudo nano /usr/local/bin/backup-kontak.sh
 - Use `t3.micro` instances (free tier eligible)
 - Use `db.t3.micro` for RDS (free tier eligible)
 - Setup CloudWatch alarms for monitoring
-- Consider using Application Load Balancer for high availability
 
 ---
 
@@ -386,9 +344,8 @@ sudo nano /usr/local/bin/backup-kontak.sh
 Once everything is setup:
 - **HTTP:** `http://your-domain.com`
 - **HTTPS:** `https://your-domain.com` (after SSL setup)
-- **Direct IP:** `http://your-ec2-ip` (for testing)
-
-Your Laravel application will now run 24/7 on AWS, automatically restart if it crashes, and persist even when you close your terminal/console!
+- **Direct IP:** `http://your-ec2-ip:8000` (Laravel dev server)
+- **Through Nginx:** `http://your-ec2-ip` (production setup)
 
 ---
 
@@ -424,7 +381,7 @@ All demo accounts use the password: **`password`**
 
 1. **Permission errors:**
    ```bash
-   sudo chown -R www-data:www-data /var/www/kontak
+   sudo chown -R nginx:nginx /var/www/kontak
    sudo chmod -R 755 /var/www/kontak
    sudo chmod -R 775 /var/www/kontak/storage
    ```
@@ -432,18 +389,30 @@ All demo accounts use the password: **`password`**
 2. **Database connection errors:**
    - Check RDS security group allows EC2 connection
    - Verify `.env` database credentials
-   - Test connection: `mysql -h your-rds-endpoint -u admin -p`
+   - Check Laravel logs: `tail -f /var/www/kontak/storage/logs/laravel.log`
 
 3. **Application not accessible:**
-   - Check EC2 security group allows HTTP/HTTPS
+   - Check EC2 security group allows HTTP/HTTPS/port 8000
    - Verify Nginx configuration: `sudo nginx -t`
-   - Check PM2 status: `pm2 status`
+   - Check application status: `ps aux | grep "artisan serve"`
+   - Check services: `sudo systemctl status nginx php-fpm`
 
 4. **SSL certificate issues:**
    - Ensure domain points to EC2 IP
    - Check DNS propagation
    - Verify Nginx configuration
 
+5. **PHP-FPM connection issues:**
+   - Check PHP-FPM status: `sudo systemctl status php-fpm`
+   - Verify PHP-FPM configuration: `sudo nano /etc/php-fpm.d/www.conf`
+   - Check PHP-FPM logs: `sudo tail -f /var/log/php-fpm/www-error.log`
+
+6. **Laravel application won't start:**
+   - Check application logs: `tail -f /var/log/laravel-app.log`
+   - Verify permissions on storage directory
+   - Ensure `.env` file exists and is readable
+   - Check if process is already running: `ps aux | grep "artisan serve"`
+
 ---
 
-**🎉 Congratulations! Your Laravel application is now running in production on AWS!** 
+**🎉 Congratulations! Your Laravel application is now running in production on AWS Linux with nohup!** 
