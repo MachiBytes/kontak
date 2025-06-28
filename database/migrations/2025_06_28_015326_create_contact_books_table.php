@@ -11,16 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('contacts', function (Blueprint $table) {
+        Schema::create('contact_books', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('owner_id')->constrained('users')->onDelete('cascade');
             $table->string('name');
-            $table->string('email');
-            $table->string('phone_number');
-            $table->text('address');
-            $table->text('note')->nullable();
-            $table->string('profile_picture_url')->nullable();
+            $table->string('color', 20)->default('blue');
             $table->timestamps();
+
+            $table->index(['owner_id']);
         });
     }
 
@@ -29,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('contacts');
+        Schema::dropIfExists('contact_books');
     }
 };

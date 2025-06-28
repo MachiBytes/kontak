@@ -79,6 +79,49 @@ Visit http://127.0.0.1:8000 in your browser.
 
 ---
 
+## 🎭 Demo Data & Test Accounts
+
+To populate the database with sample data for testing and demonstration:
+
+```bash
+php artisan db:seed --class=DemoDataSeeder
+```
+
+### 👤 Login Credentials
+
+All demo accounts use the password: **`password`**
+
+#### 🏢 Main Account (Contact Book Owner)
+- **Email:** `developers@kontak.app`
+- **Name:** Kontak Developers
+- **Role:** Owner
+- **Features:** Full access to personal contact book with 65+ sample contacts
+
+#### 👨‍💼 Admin Users (Full CRUD Access)
+- **Mark Flores:** `mark.flores@kontak.app`
+- **Isaeus Guiang:** `isaeus.guiang@kontak.app`
+- **Jedric Vicente:** `jedric.vicente@kontak.app`
+- **Ceferino Arrey:** `ceferino.arrey@kontak.app`
+- **Rainier Reyes:** `rainier.reyes@kontak.app`
+
+*Admin users have full CRUD access to Kontak Developers' contact book but empty personal contact books.*
+
+#### 👥 Audience Users (Read-Only Access)
+- **Marketing:** `marketing@kontak.app`
+- **Sales:** `sales@kontak.app`
+- **Customer Service:** `support@kontak.app`
+
+*Audience users have read-only access to Kontak Developers' contact book with copy-to-clipboard functionality.*
+
+### 📋 Sample Data Includes:
+- **65+ realistic contacts** covering all alphabet letters (A-Z)
+- **Multiple contact methods** (phones, emails, websites)
+- **Professional information** (job titles, addresses, notes)
+- **Role-based access control** demonstration
+- **Complete contact management** workflow examples
+
+---
+
 ### 🔄 Pushing to GitHub
 
 Commit and push
