@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\ContactBook;
+use App\Models\UserAccess;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -34,6 +36,9 @@ class HomeController extends Controller
         if (!$user->canAccessContactBook($contactBook)) {
             abort(403, 'You do not have access to this contact book.');
         }
+
+        // Track last accessed timestamp for shared contact books
+        $this->updateLastAccessedTimestamp($contactBook, $user);
 
         // Get contacts with search functionality
         $search = $request->get('search');
@@ -87,6 +92,20 @@ class HomeController extends Controller
     private function getContactBookBySlug(string $slug): ?ContactBook
     {
         return ContactBook::findBySlug($slug);
+    }
+
+    /**
+     * Update last accessed timestamp for shared contact books
+     */
+    private function updateLastAccessedTimestamp(ContactBook $contactBook, User $user): void
+    {
+        // Only track for shared contact books (not personal ones)
+        if ($contactBook->owner_id !== $user->id) {
+            $userAccess = $contactBook->getUserAccess($user->email);
+            if ($userAccess) {
+                $userAccess->updateLastAccessed();
+            }
+        }
     }
 
     /**

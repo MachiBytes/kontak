@@ -322,6 +322,45 @@ document.addEventListener('DOMContentLoaded', function() {
     // CSRF Token
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
+    // Timezone conversion utilities
+    function formatTimestampToLocal(isoString) {
+        const date = new Date(isoString);
+
+        const dateOptions = {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        };
+
+        const timeOptions = {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        };
+
+        return {
+            date: date.toLocaleDateString('en-US', dateOptions),
+            time: date.toLocaleTimeString('en-US', timeOptions)
+        };
+    }
+
+    function updateTimestampDisplays() {
+        document.querySelectorAll('.timestamp-display').forEach(element => {
+            const timestamp = element.getAttribute('data-timestamp');
+            if (timestamp) {
+                const formatted = formatTimestampToLocal(timestamp);
+                const dateEl = element.querySelector('.timestamp-date');
+                const timeEl = element.querySelector('.timestamp-time');
+
+                if (dateEl) dateEl.textContent = formatted.date;
+                if (timeEl) timeEl.textContent = formatted.time;
+            }
+        });
+    }
+
+    // Initialize timezone conversion
+    updateTimestampDisplays();
+
     // Utility functions
     function showToast(message, type = 'success') {
         // Create toast notification
@@ -646,6 +685,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const newRow = createUserRow(data.userAccess);
                 tableBody.insertAdjacentHTML('afterbegin', newRow);
 
+                // Update timestamp displays in the new row
+                updateTimestampDisplays();
+
             } else {
                 if (data.errors) {
                     showFieldErrors(form, data.errors);
@@ -664,22 +706,24 @@ document.addEventListener('DOMContentLoaded', function() {
     function createUserRow(userAccess) {
         const userName = userAccess.user ? userAccess.user.name : 'Invited User';
         const initials = userAccess.email.substring(0, 2).toUpperCase();
-        const invitedDate = new Date(userAccess.invited_at).toLocaleDateString('en-US', {
-            month: 'short', day: 'numeric', year: 'numeric'
-        });
-        const invitedTime = new Date(userAccess.invited_at).toLocaleTimeString('en-US', {
-            hour: 'numeric', minute: '2-digit', hour12: true
-        });
 
+        // Format invited timestamp
+        const invitedTimestamp = `
+            <div class="timestamp-display" data-timestamp="${userAccess.invited_at}">
+                <div class="text-sm text-gray-900 timestamp-date"></div>
+                <div class="text-xs text-gray-500 timestamp-time"></div>
+            </div>
+        `;
+
+        // Format last accessed timestamp
         let lastAccessed = '<span class="text-sm text-gray-400">Never</span>';
         if (userAccess.last_accessed_at) {
-            const lastDate = new Date(userAccess.last_accessed_at).toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', year: 'numeric'
-            });
-            const lastTime = new Date(userAccess.last_accessed_at).toLocaleTimeString('en-US', {
-                hour: 'numeric', minute: '2-digit', hour12: true
-            });
-            lastAccessed = `<div class="text-sm text-gray-900">${lastDate}</div><div class="text-xs text-gray-500">${lastTime}</div>`;
+            lastAccessed = `
+                <div class="timestamp-display" data-timestamp="${userAccess.last_accessed_at}">
+                    <div class="text-sm text-gray-900 timestamp-date"></div>
+                    <div class="text-xs text-gray-500 timestamp-time"></div>
+                </div>
+            `;
         }
 
         return `
@@ -706,8 +750,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </select>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div class="text-sm text-gray-900">${invitedDate}</div>
-                    <div class="text-xs text-gray-500">${invitedTime}</div>
+                    ${invitedTimestamp}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     ${lastAccessed}

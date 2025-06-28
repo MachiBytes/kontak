@@ -25,13 +25,17 @@
         </select>
     </td>
     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-        <div class="text-sm text-gray-900">{{ $access->invited_at->format('M j, Y') }}</div>
-        <div class="text-xs text-gray-500">{{ $access->invited_at->format('g:i A') }}</div>
+        <div class="timestamp-display" data-timestamp="{{ $access->invited_at->toISOString() }}">
+            <div class="text-sm text-gray-900 timestamp-date"></div>
+            <div class="text-xs text-gray-500 timestamp-time"></div>
+        </div>
     </td>
     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
         @if($access->last_accessed_at)
-            <div class="text-sm text-gray-900">{{ $access->last_accessed_at->format('M j, Y') }}</div>
-            <div class="text-xs text-gray-500">{{ $access->last_accessed_at->format('g:i A') }}</div>
+            <div class="timestamp-display" data-timestamp="{{ $access->last_accessed_at->toISOString() }}">
+                <div class="text-sm text-gray-900 timestamp-date"></div>
+                <div class="text-xs text-gray-500 timestamp-time"></div>
+            </div>
         @else
             <span class="text-sm text-gray-400">Never</span>
         @endif
