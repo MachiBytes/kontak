@@ -26,6 +26,13 @@ class Contact extends Model
         'websites' => 'array',
     ];
 
+    protected $appends = [
+        'initials',
+        'primary_email',
+        'primary_phone',
+        'primary_website',
+    ];
+
     /**
      * Get the contact book this contact belongs to
      */

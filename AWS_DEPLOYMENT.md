@@ -290,6 +290,71 @@ echo $! > /var/www/kontak/laravel.pid
 tail -f /var/log/laravel-app.log
 ```
 
+---
+
+## **Phase 7: Setup SSL with Let's Encrypt (Optional but Recommended)**
+
+### Install Certbot:
+```bash
+sudo yum install -y certbot python3-certbot-nginx
+```
+
+### Get SSL certificate:
+```bash
+sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+```
+
+---
+
+## **Phase 8: Setup Firewall**
+
+### Configure firewalld:
+```bash
+# Start and enable firewalld
+sudo systemctl start firewalld
+sudo systemctl enable firewalld
+
+# Allow SSH, HTTP, and HTTPS
+sudo firewall-cmd --permanent --add-service=ssh
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=https
+
+# Allow Laravel dev server port
+sudo firewall-cmd --permanent --add-port=8000/tcp
+
+# Reload firewall rules
+sudo firewall-cmd --reload
+```
+
+---
+
+## **Phase 9: Domain Setup**
+
+### Point your domain to EC2:
+- Go to your domain registrar (GoDaddy, Namecheap, etc.)
+- Create an A record pointing to your EC2 public IP
+- Example: `yourdomain.com` → `54.123.45.67`
+
+---
+
+## **Phase 10: Monitoring and Maintenance**
+
+### Check application status:
+```bash
+# Check if Laravel server is running
+ps aux | grep "artisan serve"
+
+# View application server logs
+tail -f /var/log/laravel-app.log
+
+# View Laravel application logs
+tail -f /var/www/kontak/storage/logs/laravel.log
+
+# View Nginx logs
+sudo tail -f /var/log/nginx/error.log
+sudo tail -f /var/log/nginx/access.log
+```
+
 ### Update application:
 ```bash
 cd /var/www/kontak

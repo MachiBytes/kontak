@@ -60,7 +60,7 @@
                         @endforeach
                     </div>
                 @endforeach
-            </div>
+                        </div>
         @else
             <div class="text-center py-12">
                 <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -431,8 +431,8 @@ function loadContactForm(contact = null) {
                 </div>
                 <div id="websites-container" class="space-y-3">
                     ${websitesHtml}
-                </div>
-            </div>
+    </div>
+</div>
 
             <div>
                 <label for="address" class="block text-sm font-medium text-gray-700 mb-2">Address</label>
