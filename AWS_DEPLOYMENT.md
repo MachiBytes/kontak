@@ -264,7 +264,7 @@ sudo systemctl restart php-fpm
 cd /var/www/kontak
 
 # Start Laravel in background with nohup
-nohup php artisan serve --host=0.0.0.0 --port=8000 > /var/log/laravel-app.log 2>&1 &
+nohup php artisan serve --host=0.0.0.0 --port=8000 > logs/laravel-app.log 2>&1 &
 
 # Save the process ID for future reference
 echo $! > /var/www/kontak/laravel.pid
@@ -283,76 +283,11 @@ kill $(cat /var/www/kontak/laravel.pid)
 
 # Restart the application
 cd /var/www/kontak
-nohup php artisan serve --host=0.0.0.0 --port=8000 > /var/log/laravel-app.log 2>&1 &
+nohup php artisan serve --host=0.0.0.0 --port=8000 > logs/laravel-app.log 2>&1 &
 echo $! > /var/www/kontak/laravel.pid
 
 # View application server logs
-tail -f /var/log/laravel-app.log
-```
-
----
-
-## **Phase 7: Setup SSL with Let's Encrypt (Optional but Recommended)**
-
-### Install Certbot:
-```bash
-sudo yum install -y certbot python3-certbot-nginx
-```
-
-### Get SSL certificate:
-```bash
-sudo certbot --nginx -d your-domain.com -d www.your-domain.com
-```
-
----
-
-## **Phase 8: Setup Firewall**
-
-### Configure firewalld:
-```bash
-# Start and enable firewalld
-sudo systemctl start firewalld
-sudo systemctl enable firewalld
-
-# Allow SSH, HTTP, and HTTPS
-sudo firewall-cmd --permanent --add-service=ssh
-sudo firewall-cmd --permanent --add-service=http
-sudo firewall-cmd --permanent --add-service=https
-
-# Allow Laravel dev server port
-sudo firewall-cmd --permanent --add-port=8000/tcp
-
-# Reload firewall rules
-sudo firewall-cmd --reload
-```
-
----
-
-## **Phase 9: Domain Setup**
-
-### Point your domain to EC2:
-- Go to your domain registrar (GoDaddy, Namecheap, etc.)
-- Create an A record pointing to your EC2 public IP
-- Example: `yourdomain.com` → `54.123.45.67`
-
----
-
-## **Phase 10: Monitoring and Maintenance**
-
-### Check application status:
-```bash
-# Check if Laravel server is running
-ps aux | grep "artisan serve"
-
-# View application server logs
-tail -f /var/log/laravel-app.log
-
-# View Laravel application logs
-tail -f /var/www/kontak/storage/logs/laravel.log
-
-# View Nginx logs
-sudo tail -f /var/log/nginx/error.log
-sudo tail -f /var/log/nginx/access.log
+tail -f logs/laravel-app.log
 ```
 
 ### Update application:
@@ -374,45 +309,9 @@ php artisan route:cache
 php artisan view:cache
 
 # Restart application
-nohup php artisan serve --host=0.0.0.0 --port=8000 > /var/log/laravel-app.log 2>&1 &
+nohup php artisan serve --host=0.0.0.0 --port=8000 > logs/laravel-app.log 2>&1 &
 echo $! > /var/www/kontak/laravel.pid
 ```
-
----
-
-## **🔐 Security Considerations**
-
-### Keep system updated:
-```bash
-sudo yum update -y
-```
-
-### Change default SSH port (optional):
-```bash
-sudo nano /etc/ssh/sshd_config
-# Change Port 22 to Port 2222
-sudo systemctl restart sshd
-```
-
----
-
-## **💰 Cost Optimization**
-
-- Use `t3.micro` instances (free tier eligible)
-- Use `db.t3.micro` for RDS (free tier eligible)
-- Setup CloudWatch alarms for monitoring
-
----
-
-## **🚀 Access Your Application**
-
-Once everything is setup:
-- **HTTP:** `http://your-domain.com`
-- **HTTPS:** `https://your-domain.com` (after SSL setup)
-- **Direct IP:** `http://your-ec2-ip:8000` (Laravel dev server)
-- **Through Nginx:** `http://your-ec2-ip` (production setup)
-
----
 
 ## **📋 Demo Data Access**
 
@@ -439,45 +338,3 @@ All demo accounts use the password: **`password`**
 - `support@kontak.app`
 
 ---
-
-## **🔧 Troubleshooting**
-
-### Common Issues:
-
-1. **Permission errors:**
-   ```bash
-   sudo chown -R nginx:nginx /var/www/kontak
-   sudo chmod -R 755 /var/www/kontak
-   sudo chmod -R 775 /var/www/kontak/storage
-   ```
-
-2. **Database connection errors:**
-   - Check RDS security group allows EC2 connection
-   - Verify `.env` database credentials
-   - Check Laravel logs: `tail -f /var/www/kontak/storage/logs/laravel.log`
-
-3. **Application not accessible:**
-   - Check EC2 security group allows HTTP/HTTPS/port 8000
-   - Verify Nginx configuration: `sudo nginx -t`
-   - Check application status: `ps aux | grep "artisan serve"`
-   - Check services: `sudo systemctl status nginx php-fpm`
-
-4. **SSL certificate issues:**
-   - Ensure domain points to EC2 IP
-   - Check DNS propagation
-   - Verify Nginx configuration
-
-5. **PHP-FPM connection issues:**
-   - Check PHP-FPM status: `sudo systemctl status php-fpm`
-   - Verify PHP-FPM configuration: `sudo nano /etc/php-fpm.d/www.conf`
-   - Check PHP-FPM logs: `sudo tail -f /var/log/php-fpm/www-error.log`
-
-6. **Laravel application won't start:**
-   - Check application logs: `tail -f /var/log/laravel-app.log`
-   - Verify permissions on storage directory
-   - Ensure `.env` file exists and is readable
-   - Check if process is already running: `ps aux | grep "artisan serve"`
-
----
-
-**🎉 Congratulations! Your Laravel application is now running in production on AWS Linux with nohup!** 
