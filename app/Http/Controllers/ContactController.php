@@ -161,7 +161,8 @@ class ContactController extends Controller
                 'success' => true,
                 'contact' => $contact,
                 'contactBook' => $contactBook,
-                'canEdit' => $this->canUserEditContacts($contactBook)
+                'canEdit' => $this->canUserEditContacts($contactBook),
+                'canUpdate' => $this->canUserUpdateContacts($contactBook)
             ]);
         }
 
@@ -175,8 +176,8 @@ class ContactController extends Controller
     {
         $contactBook = $contact->contactBook;
 
-        // Check if user can edit this contact book
-        if (!$this->canUserEditContacts($contactBook)) {
+        // Check if user can update this contact book
+        if (!$this->canUserUpdateContacts($contactBook)) {
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
@@ -204,8 +205,8 @@ class ContactController extends Controller
     {
         $contactBook = $contact->contactBook;
 
-        // Check if user can edit this contact book
-        if (!$this->canUserEditContacts($contactBook)) {
+        // Check if user can update this contact book
+        if (!$this->canUserUpdateContacts($contactBook)) {
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
@@ -317,6 +318,7 @@ class ContactController extends Controller
 
     /**
      * Check if the current user can edit contacts in the given contact book
+     * This is used for create and delete operations (admin access required)
      */
     private function canUserEditContacts(ContactBook $contactBook): bool
     {
@@ -330,6 +332,24 @@ class ContactController extends Controller
         // Check if user has admin access
         $userAccess = $contactBook->getUserAccess($user->email);
         return $userAccess && $userAccess->isAdmin();
+    }
+
+    /**
+     * Check if the current user can update contacts in the given contact book
+     * This allows both admin and audience users to update existing contacts
+     */
+    private function canUserUpdateContacts(ContactBook $contactBook): bool
+    {
+        $user = Auth::user();
+
+        // Owner can always update
+        if ($contactBook->owner_id === $user->id) {
+            return true;
+        }
+
+        // Check if user has admin or audience access
+        $userAccess = $contactBook->getUserAccess($user->email);
+        return $userAccess && ($userAccess->isAdmin() || $userAccess->isAudience());
     }
 
     /**
